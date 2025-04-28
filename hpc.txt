@@ -384,89 +384,97 @@ Average: 12.4
 
 //MATRIX_MULTIPLICATION
 
-%%writefile mul.cu
+%%writefile matmul.cu
 
-#include 
-#include 
+#include<stdio.h>
+#include<time.h>
+#define SIZE 2
 
-__global__ void matmul(int* A, int* B, int* C, int N) {
-    int Row = blockIdx.y * blockDim.y + threadIdx.y;
-    int Col = blockIdx.x * blockDim.x + threadIdx.x;
+int A[SIZE][SIZE];
+int B[SIZE][SIZE];
 
-    if (Row < N && Col < N) {
-        int Pvalue = 0;
-        for (int k = 0; k < N; k++) {
-            Pvalue += A[Row * N + k] * B[k * N + Col];
-        }
-        C[Row * N + Col] = Pvalue;
+void createMatrix(){
+  for(int i=0; i<SIZE; i++){
+    for(int j=0; j<SIZE;j++){
+      A[i][j] = rand()%101;
     }
+  }
+
+  for(int i=0; i<SIZE; i++){
+    for(int j=0; j<SIZE;j++){
+      B[i][j] = rand()%1001;
+    }
+  }
 }
 
-int main() {
-    int N = 512;
-    int size = N * N * sizeof(int);
-    int *A, *B, *C;
-    int *dev_A, *dev_B, *dev_C;
-
- // Allocate pinned memory on host for better performance
-    cudaMallocHost((void**)&A, size);
-    cudaMallocHost((void**)&B, size);
-    cudaMallocHost((void**)&C, size);
-
-    // Allocate memory on device
-    cudaMalloc((void**)&dev_A, size);
-    cudaMalloc((void**)&dev_B, size);
-    cudaMalloc((void**)&dev_C, size);
-
-    // Initialize matrices A and B
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            A[i * N + j] = i * N + j;
-            B[i * N + j] = j * N + i;
-        }
+void printMatrix(int A[][SIZE]){
+  for(int i=0; i<SIZE; i++){
+    for(int j=0; j<SIZE;j++){
+      printf("%d ",A[i][j] );
     }
-
-// Copy matrices to device
-    cudaMemcpy(dev_A, A, size, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_B, B, size, cudaMemcpyHostToDevice);
-
-    // Define block and grid size
-    dim3 dimBlock(16, 16);
-    dim3 dimGrid((N + dimBlock.x - 1) / dimBlock.x, (N + dimBlock.y - 1) / dimBlock.y);
-
-    // Launch kernel
-    matmul<<>>(dev_A, dev_B, dev_C, N);
-
-    // Copy result back to host
-    cudaMemcpy(C, dev_C, size, cudaMemcpyDeviceToHost);
-
-    // Print a portion of the result matrix
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 10; j++) {
-            std::cout << C[i * N + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-
-// Free memory
-    cudaFree(dev_A);
-    cudaFree(dev_B);
-    cudaFree(dev_C);
-    cudaFreeHost(A);
-    cudaFreeHost(B);
-    cudaFreeHost(C);
-
-    return 0;
+    printf("\n");
+  }
+ printf("\n");
 }
 
-!rm -rf /usr/local/cuda           # Removes any previous CUDA installations (only needed in certain environments).
-!ln -s  /usr/local/cuda-12.5 /usr/local/cuda        # Links to CUDA 12.2.
-!nvcc -arch=sm_75 mul.cu -o mul         #
+void seqMultiply(int C[][SIZE]){
+  for(int i=0; i<SIZE;i++){
+    for(int j=0; j<SIZE; j++){
+      for(int k=0; k<SIZE; k++){
+        C[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
+}
+__global__ void parallelMultipy(int *A, int *B, int *C, int n){
+  int row = threadIdx.y;
+  int col = threadIdx.x;
+  int sum = 0;
+  if(row<n && row<n){
+    for(int k=0; k<n; k++){
+      sum += A[row*n+k] * B[k*n+col];
+    }
+    C[row*n+col] = sum;
+  }
+}
+int main(){
+  int C[SIZE][SIZE]={0};
+  int *d_A, *d_B, *d_C;
+  clock_t start, end;
 
-!./mul
+  createMatrix();
+  printf("\n\n--- A ---\n");
+  printMatrix(A);
+  printf("\n\n--- b ---\n");
+  printMatrix(B);
+
+  start = clock();
+  seqMultiply(C);
+  end = clock();
+  printf("\n\n--- Sequential ---\n");
+  printMatrix(C);
+  printf("Time = %f sec.", (double)(end-start)/CLOCKS_PER_SEC);
+
+  int size = SIZE*SIZE*sizeof(int);
+  cudaMalloc(&d_A, size);
+  cudaMalloc(&d_B, size);
+  cudaMalloc(&d_C, size);
+
+  cudaMemcpy(d_A, &A, size, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_B, &B, size, cudaMemcpyHostToDevice);
+
+  start = clock();
+  dim3 blockDimension(SIZE,SIZE);
+  parallelMultipy<<<1,blockDimension>>>(d_A, d_B, d_C, SIZE);
+  cudaDeviceSynchronize();
+  cudaMemcpy(&C, d_C, size, cudaMemcpyDeviceToHost);
+  end = clock();
+  printf("\n\n--- Parallel ---\n");
+  printMatrix(C);
+  printf("Time = %f sec.", (double)(end-start)/CLOCKS_PER_SEC);
+
+}
 
 
-
-
-
-
+!nvcc -arch=sm_75 matmul.cu -o matmul.exe
+!./matmul.exe
