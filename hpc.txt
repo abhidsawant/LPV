@@ -1,155 +1,85 @@
 // BFS_DFS
-#include<iostream>
-#include<omp.h>
+
+#include <iostream>
+#include <queue>
+#include <vector>
+#include <stack>
+#include <omp.h>
 using namespace std;
 
-#define MAX 100
+void bfs(int start, vector<vector<int>>& adj, vector<bool>& visited) {
+    queue<int> q;
+    q.push(start);
+    visited[start] = true;
 
-int graph[MAX][MAX];
-int visited[MAX];
-int queue[MAX];
-int stack[MAX];
-int front=0, rear=-1;
-int top=-1;
-int V;
+    while (!q.empty()) {
+        int node = q.front();
+        q.pop();
+        cout << node << " ";
 
-void createGraph(){
-    int ch;
-
-    cout<<"Enter total vertices = ";
-    cin>>V;
-
-    for(int i=0; i<V;i++){
-        for(int j=i+1; j<V;j++){
-            graph[i][j]=0;
-        }
-    }
-
-    for(int i=0; i<V;i++){
-        for(int j=i+1; j<V;j++){
-            cout<<"\n> Is edge between "<<i<<" "<<j<<" (yes:1) = ";
-            cin>>ch;
-            if(ch==1){
-                graph[i][j]=graph[j][i]=1;
-            }
-            else{
-                graph[i][j]=graph[j][i]=0;
-            }
-        }
-    }
-
-    cout<<"\n\nAdjancecy Matrix \n";
-    for(int i=0; i<V;i++){
-        for(int j=0; j<V;j++){
-            cout<<graph[i][j]<<" ";
-        }
-        cout<<"\n";
-    }
-}
-
-// Queue operations 
-void enqueue(int ver){
-    queue[++rear] = ver;
-}
-int dequeue(){
-    int ver = queue[front];
-    front++;
-    return ver;
-}
-bool isQueueEmpty(){
-    if(front > rear){
-        return true;
-    }
-    return false;
-}
-
-// Stack operations
-void push(int ver){
-    stack[++top]=ver;
-}
-int pop(){
-    int val = stack[top--];
-    return val;
-}
-bool isStackEmpty(){
-    if(top==-1){
-        return true;
-    }
-    return false;
-}
-
-void parallelBFS(int start){
-    int current;
-
-    for(int i=0; i<V; i++){
-        visited[i]=0;
-    }
-
-    visited[start] = 1;
-    enqueue(start);
-
-    while(!isQueueEmpty()){
-        current = dequeue();
-        cout<<current<<" ";
-        
+        // Process neighbors in parallel
         #pragma omp parallel for
-        for(int i=0; i<V; i++){
-            if(graph[current][i]==1 && visited[i]!=1){
+        for (int i = 0; i < adj[node].size(); i++) {
+            int neighbor = adj[node][i];
+            if (!visited[neighbor]) {
                 #pragma omp critical
                 {
-                    enqueue(i);
-                    visited[i]=1;
+                    if (!visited[neighbor]) { // Double-check within critical section
+                        visited[neighbor] = true;
+                        q.push(neighbor);
+                    }
                 }
             }
         }
-
-    } 
+    }
 }
 
-void parallelDFS(int start){
-    int current;
+void dfs(int start, vector<vector<int>>& adj, vector<bool>& visited) {
+    stack<int> stk;
+    stk.push(start);
+    visited[start] = true;
 
-    for(int i=0; i<V; i++){
-        visited[i]=0;
-    }
+    while (!stk.empty()) {
+        int node = stk.top();
+        stk.pop();
+        cout << node << " ";
 
-    visited[start] = 1;
-    push(start);
-
-    while(!isStackEmpty()){
-        current = pop();
-        cout<<current<<" ";
-
+        // Process neighbors in parallel
         #pragma omp parallel for
-        for(int i=0; i<V; i++){
-            if(graph[current][i]==1 && visited[i]!=1){
+        for (int i = 0; i < adj[node].size(); i++) {
+            int neighbor = adj[node][i];
+            if (!visited[neighbor]) {
                 #pragma omp critical
                 {
-                    push(i);
-                    visited[i]=1;
+                    if (!visited[neighbor]) { // Double-check within critical section
+                        visited[neighbor] = true;
+                        stk.push(neighbor);
+                    }
                 }
             }
         }
-
-    } 
+    }
 }
 
-int main(){
-    double start, end;
-    createGraph();
-    
-    cout<<"BFS \n\n";
-    start = omp_get_wtime();
-    parallelBFS(0);
-    end = omp_get_wtime();
-    cout<<"\n > Time "<<(end-start)*1000<<" ms";
+int main() {
+    cout << "Enter number of nodes and edges: ";
+    int n, m;
+    cin >> n >> m;
 
-    cout<<"DFS \n\n";
-    start = omp_get_wtime();
-    parallelDFS(0);
-    end = omp_get_wtime();
-    cout<<"\n > Time "<<(end-start)*1000<<" ms";
+    vector<vector<int>> adj(n + 1);  // Adjacency list (1-based indexing)
+
+    cout << "Enter Edges (U, V): ";
+    for (int i = 0; i < m; i++) {
+        int u, v;
+        cin >> u >> v;
+        adj[u].push_back(v);
+        adj[v].push_back(u);  // For undirected graph
+    }
+
+
+    return 0;
 }
+
 
 // Merge_BUBBLE_SORT
 #include<iostream>
@@ -158,146 +88,171 @@ using namespace std;
 
 #define MAX 100000
 
-int arr1_b[MAX];
-int arr2_b[MAX];
-int arr1_m[MAX];
-int arr2_m[MAX];
-
-void createArray(){
-    int a;
-    for(int i=0; i<MAX;i++){
-        a = rand() % 101;  // 0 to 100
-        arr1_b[i] = arr2_b[i] = arr1_m[i] = arr2_m[i] = a;
-    }
-}
-
-void sequentialBubbleSort(){
-    for(int i=MAX; i>0; i--){
-        for(int j=0;j<i-1;j++){
-            if(arr1_b[j] > arr1_b[j+1]){
-                swap(arr1_b[j], arr1_b[j+1]);
-            }
-        }
-    }
-}
-void parallelBubbleSort(){
-    for(int i=0; i<MAX; i++){
-        
-        #pragma omp parallel for
-        for(int j=0; j<MAX-1; j+=2){
-            if(arr2_b[j] > arr2_b[j+1]){
-                swap(arr2_b[j], arr2_b[j+1]);
-            }
-        }
-        
-        #pragma omp parallel for
-        for(int j=1; j<MAX-1; j+=2){
-            if(arr2_b[j] > arr2_b[j+1]){
-                swap(arr2_b[j], arr2_b[j+1]);
-            }
-        }
-    }
-}
-
 void merge(int arr[], int l, int m, int r){
-    int n1 = m-l+1;
-    int n2 = r-m;
+    int n1 = m - l + 1;
+    int n2 = r - m;
+
     int L[n1], R[n2];
 
-    for(int i=0;i<n1;i++){
-        L[i] = arr[i+l];
+    for (int i = 0; i < n1; i++){
+        L[i] = arr[l + i];
     }
-    for(int i=0;i<n2;i++){
-        R[i] = arr[i+m+1];
+    for (int i = 0; i < n2; i++){
+        R[i] = arr[m + 1 + i];
     }
 
-    int i=0, j=0, k=l;
+    int i = 0, j = 0, k = l;
 
-    while(i<n1 && j<n2){
-        if(L[i]>R[j]){
+    while(i < n1 && j < n2) {
+        if (L[i] < R[j]){  
             arr[k++] = L[i++];
         }
         else{
             arr[k++] = R[j++];
         }
     }
-    while(i<n1){
+
+    while (i < n1){
         arr[k++] = L[i++];
     }
-    while(i<n1){
+    while (j < n2){
         arr[k++] = R[j++];
     }
 
 }
-void sequentialMergeSort(int l, int r){
-    int m;
-    if(l<r){
-        m = (l+r)/2;
-        sequentialMergeSort(l, m);
-        sequentialMergeSort(m+1, r);
-        merge(arr1_m, l, m, r);
+
+void sequentialMergeSort(int arr[], int l, int r) {
+    if (l < r) {
+        int m = (l + r) / 2;
+        sequentialMergeSort(arr, l, m);
+        sequentialMergeSort(arr, m + 1, r);
+        merge(arr, l, m, r);
     }
 }
-void parallelMergeSort(int l, int r){
-    int m;
-    if(l<r){
+
+void parallelMergeSort(int arr[], int l, int r) {
+    if (l < r) {
+        int m = (l + r) / 2;
+
         #pragma omp parallel sections
         {
-            m = (l+r)/2;
             #pragma omp section
-            sequentialMergeSort(l, m);
+            parallelMergeSort(arr, l, m);  // Recursive parallel call
 
             #pragma omp section
-            sequentialMergeSort(m+1, r);
+            parallelMergeSort(arr, m + 1, r);  // Recursive parallel call
         }
-        merge(arr1_m, l, m, r);
+
+        merge(arr, l, m, r);
+    }
+}
+
+int main(){
+    int arr1[MAX];
+    int arr2[MAX];
+    double start,end;
+
+    int a;
+    for(int i=0; i<MAX;i++){
+        a = rand() % 101;  // 0 to 100
+        arr1[i] = arr2[2] = a;
+    }
+
+    start = omp_get_wtime();
+    sequentialMergeSort(arr1,0,MAX);
+    end = omp_get_wtime();
+
+    cout<<"Time:"<<(end-start)*1000<<endl;
+    cout<<"-------------"<<endl;
+
+    start = omp_get_wtime();
+    parallelMergeSort(arr2,0,MAX);
+    end = omp_get_wtime();
+
+    cout<<"Time:"<<(end-start)*1000<<endl;
+    cout<<"-------------"<<endl;
+
+}
+
+
+#include<iostream>
+#include<omp.h>
+
+using namespace std;
+
+#define MAX 100000
+
+void bubble_sort(int arr[],int n){
+    for(int i=0;i<n-1;i++){
+        for(int j=0;j<n-i-1;j++){
+            if(arr[j]>arr[j+1]){
+                swap(arr[j],arr[j+1]);
+            }
+        }
+    }
+}
+
+void print_array(int arr[],int n){
+    for(int i=0;i<n;i++){
+        cout<<arr[i]<<" ";
+    }
+}
+
+void bubble_sort_parallel(int arr[],int n){
+    for(int i=0;i<n;i++){
+        //odd
+        if(i%2==1){
+            #pragma omp parallel for
+            for(int j=1;j<n-1;j+=2){
+                if(arr[j]>arr[j+1]){
+                    swap(arr[j],arr[j+1]);
+                }
+            }
+        }else{
+            #pragma omp parallel for
+            for(int j=0;j<n-1;j+=2){
+                if(arr[j]>arr[j+1]){
+                    swap(arr[j],arr[j+1]);
+                }
+            }
+        }
     }
 }
 
 
 int main(){
     double start, end;
-
-    createArray();
-    // for(int i=0; i<MAX;i++){
-    //     cout<<arr1_b[i]<<" ";
-    // }
     
-    cout<<"\n------------------------------------------------------------------\n";
-    start =  omp_get_wtime();
-    sequentialBubbleSort();
-    end =  omp_get_wtime();
-    // for(int i=0; i<MAX;i++){
-    //     cout<<arr1_b[i]<<" ";
-    // }
-    cout<<"\nTime Sequential Bubble Sort = "<<(end-start)*1000<<" ms.";
+    int arr1[MAX];
+    int arr2[MAX];
 
-    cout<<"\n------------------------------------------------------------------\n";
-    start =  omp_get_wtime();
-    parallelBubbleSort();
-    end =  omp_get_wtime();
-    // for(int i=0; i<MAX;i++){
-    //     cout<<arr1_b[i]<<" ";
-    // }
-    cout<<"\nTime Parallel Bubble Sort = "<<(end-start)*1000<<" ms.\n";
+    int a;
+    for(int i=0; i<MAX;i++){
+        a = rand() % 101;  // 0 to 100
+        arr1[i] = arr2[i] = a;
+    }
 
-    cout<<"\n------------------------------------------------------------------\n";
-    start =  omp_get_wtime();
-    sequentialMergeSort(0,MAX-1);
-    end =  omp_get_wtime();
-    // for(int i=0; i<MAX;i++){
-    //     cout<<arr1_b[i]<<" ";
-    // }
-    cout<<"\nTime Sequential Merge Sort = "<<(end-start)*1000<<" ms.";
+    start = omp_get_wtime();
+    bubble_sort(arr1,MAX);
+    end = omp_get_wtime();
 
-    cout<<"\n------------------------------------------------------------------\n";
-    start =  omp_get_wtime();
-    parallelMergeSort(0,MAX-1);
-    end =  omp_get_wtime();
-    // for(int i=0; i<MAX;i++){
-    //     cout<<arr1_b[i]<<" ";
-    // }
-    cout<<"\nTime Parallel Merge Sort = "<<(end-start)*1000<<" ms.";
+    cout<<"-----------"<<endl;
+    print_array(arr1,MAX);
+    cout<<"time:"<<(end-start)*1000<<endl;
+
+    int arr2[MAX];
+    for(int i=0;i<MAX;i++){
+        cin>>arr2[i];
+    }
+
+    start = omp_get_wtime();
+    bubble_sort_parallel(arr2,MAX);
+    end = omp_get_wtime();
+
+    cout<<"-----------"<<endl;
+    print_array(arr2,MAX);
+    cout<<"time:"<<(end-start)*1000<<endl;
+
 
 }
 
